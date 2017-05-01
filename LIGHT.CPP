@@ -37,6 +37,9 @@
 
 #include "Ram.h"
 
+#define RWM_GOURAUD 1
+#define DEBUG_RWM_GOURAUD 1
+
 float		LightScale		= 1.00f;
 float		EntityScale		= 1.00f;
 float		MaxLight		= 230.0f;
@@ -65,7 +68,8 @@ FInfo		*FaceInfo;
 geVec3d		*VertNormals;
 
 void		FinalizeRGBVerts(void);
-geBoolean	LightFaces(void);
+void		FinalizeRGBVert( geVec3d* a_Color ) ;
+geBoolean	LightFaces(int a_GouraudShading);
 geBoolean	MakeVertNormals(void);
 geBoolean	SaveLightmaps(geVFile *f);
 void		FreeLightmaps(void);
@@ -96,6 +100,11 @@ typedef enum
 	DLight_Point,
 	DLight_Spot,
 	DLight_Surface,
+	// LWM: start
+	DLight_Sun,
+	// LWM: end
+	// Wismerhill
+	DLight_SunLight
 } Light_DirectLightType;
 
 typedef struct Light_DirectLight
@@ -108,11 +117,39 @@ typedef struct Light_DirectLight
 	geVec3d					Color;
 	float					Intensity;
 	Light_DirectLightType	Type;
+	// LWM: start
+	int					SunFallOffType ;
+	float					SunFallOffRadiusInTexels ;
+	float					SunFallOff100PercentRadius ;
+	float					SunFallOffAlpha ;
+	bool					SunRGBOnly ;
+	bool					SunRGBAlwaysVisible ;
+	// LWM: end
 } Light_DirectLight;
+
+// LWM: start
+#define SUN_MIN_FALLOFF_TYPE    0
+#define SUN_FALLOFF_NONE        0
+#define SUN_FALLOFF_HARD_RADIUS 1
+#define SUN_FALLOFF_GRADUALLY1  2
+#define SUN_FALLOFF_GRADUALLY2  3
+#define SUN_MAX_FALLOFF_TYPE    3
+
+#define DEBUG_SUN 0
+// LWM: end
 
 Light_DirectLight	*DirectClusterLights[MAX_DIRECT_CLUSTER_LIGHTS];
 Light_DirectLight	*DirectLights[MAX_DIRECT_LIGHTS];
 int32				NumDirectLights = 0;
+
+#if DEBUG_RWM_GOURAUD
+static void DebugWriteVertexSetFileName( const char* a_FileName ) ;
+static void DebugWriteVertex( 
+	const geVec3d* a_Vert, 
+	const geVec3d* a_Color, 
+	const geVec3d* a_Normal, 
+	int a_LightsCount, Light_DirectLight** a_LightsFound );
+#endif
 
 //====================================================================================
 //	LightGBSPFile
@@ -122,6 +159,12 @@ geBoolean LightGBSPFile(char *FileName, LightParms *Parms)
 	geVFile	*f;
 	char	PalFile[MAX_PATH];
 	char	RecFile[MAX_PATH];
+
+#if DEBUG_RWM_GOURAUD
+	// TODO: remove?
+	GHook.Printf("FileName %s\n", FileName ) ;
+	DebugWriteVertexSetFileName( FileName ) ;
+#endif
 
 	f = NULL;
 
@@ -204,7 +247,7 @@ geBoolean LightGBSPFile(char *FileName, LightParms *Parms)
 	}
 	
 	// Light faces, and apply to patches
-	if (!LightFaces())		// Light all the faces lightmaps, and apply to patches
+	if (!LightFaces(Parms->Verbose))		// Light all the faces lightmaps, and apply to patches
 		goto ExitWithError;
 
 	FreeDirectLights();
@@ -281,16 +324,27 @@ void CleanupLight(void)
 //====================================================================================
 //	FinalizeRGBVerts
 //====================================================================================
+void FinalizeRGBVert( geVec3d* a_Color )
+{
+	// add ambient light (min light)
+	geVec3d_Add(a_Color, &MinLight, a_Color);
+	// force (scale) into range 0..255
+	ColorClamp(a_Color, MaxLight, a_Color);
+}
+
+//====================================================================================
+//	FinalizeRGBVerts
+//====================================================================================
 void FinalizeRGBVerts(void)
 {
 	int32		i;
 
 	for (i=0; i< NumGFXRGBVerts; i++)
 	{
-		geVec3d_Add(&GFXRGBVerts[i], &MinLight, &GFXRGBVerts[i]);
-		ColorClamp(&GFXRGBVerts[i], MaxLight, &GFXRGBVerts[i]);
+		FinalizeRGBVert( &GFXRGBVerts[i] ) ;
 	}
 }
+
 
 //====================================================================================
 //	MakeVertNormals
@@ -458,11 +512,22 @@ float VOfs[5] = { 0.0f,-0.5f,-0.5f, 0.5f, 0.5f};
 //====================================================================================
 //	LightFaces
 //====================================================================================
-geBoolean LightFaces(void)
+geBoolean LightFaces(int a_GouraudShading)
 {
 	int32		i, s;
 	geBoolean	Hit;
 	int32		Perc;
+
+#if DEBUG_RWM_GOURAUD
+	if( a_GouraudShading )
+	{
+		GHook.Printf("Using RWM Gouraud coloring %d RGB faces\n", NumGFXRGBVerts );
+	}
+	else
+	{
+		GHook.Printf("Skipping RWM Gouraud coloring %d RGB faces (Full Vis only)\n", NumGFXRGBVerts );
+	}
+#endif
 
 	Lightmaps = GE_RAM_ALLOCATE_ARRAY(LInfo,NumGFXFaces);
 
@@ -506,6 +571,21 @@ geBoolean LightFaces(void)
 		GetFacePlane(i, &FaceInfo[i].Plane);
 		FaceInfo[i].Face = i;
 
+#if RWM_GOURAUD
+		if( a_GouraudShading )
+		{
+			// always RGB (also for LM faces)
+			if (!GouraudShadeFace(i))
+			{
+				GHook.Error("LightFaces:  GouraudShadeFace failed...\n");
+				return GE_FALSE;
+			}
+		}
+		
+		if (DoRadiosity)
+			TransferLightToPatches(i);
+#else
+		// only RGB coloring for Gouraud shaded faces
 		if (GFXTexInfo[GFXFaces[i].TexInfo].Flags & TEXINFO_GOURAUD)
 		{
 			if (!GouraudShadeFace(i))
@@ -516,8 +596,10 @@ geBoolean LightFaces(void)
 			
 			if (DoRadiosity)
 				TransferLightToPatches(i);
-			continue;
+			
+			continue; // NOTE: (!)
 		}
+#endif
 		
 		/*
 		if (GFXTexInfo[GFXFaces[i].TexInfo].Flags & TEXINFO_FLAT)
@@ -566,6 +648,127 @@ geBoolean LightFaces(void)
 	return GE_TRUE;
 }
 
+// LWM: start
+float SunCalcLightValue( Light_DirectLight* DLight, float Dist, float Angle, float Intensity, bool a_SkipRGBOnly )
+{
+	float result = 0.0f ;
+
+	if( a_SkipRGBOnly && DLight->SunRGBOnly )
+	{
+		return 0.0f ;
+	}
+
+	switch( DLight->SunFallOffType )
+	{
+		default :
+		case SUN_FALLOFF_NONE :
+			result = Intensity * Angle ;
+			break ;
+		case SUN_FALLOFF_HARD_RADIUS :
+			if( Dist > DLight->SunFallOffRadiusInTexels )
+			{
+				result = 0.0f ;
+			}
+			else
+			{
+				result = Intensity * Angle ;
+			}			
+			break ;
+		case SUN_FALLOFF_GRADUALLY1:
+		case SUN_FALLOFF_GRADUALLY2:
+			if( Dist > DLight->SunFallOffRadiusInTexels )
+			{
+				// outside any radius
+				result = 0.0f ;
+			}
+			if( Dist < DLight->SunFallOff100PercentRadius )
+			{
+				// inside the 100% radius
+				result = Intensity * Angle ;
+			}
+			else
+			{
+				// somewhere between
+				float r, dr, alpha ;
+				dr =	Dist - DLight->SunFallOff100PercentRadius;
+				r  =	DLight->SunFallOffRadiusInTexels - DLight->SunFallOff100PercentRadius ;
+				alpha = DLight->SunFallOffAlpha ;
+
+				if( DLight->SunFallOffType == SUN_FALLOFF_GRADUALLY1 )
+				{
+					//result = (( DLight->SunFallOffRadiusInTexels - Dist ) / DLight->SunFallOffRadiusInTexels ) * 
+					result = 1.0f - (float) pow( dr / r, alpha ) ;
+				}
+				else
+				{
+					result = (float) pow( ( r - dr ) / r, alpha ) ;
+				}
+				result *= Intensity * Angle ;
+			}			
+			break ;
+	}
+	return result ;
+}
+// LWM: end
+
+#if DEBUG_RWM_GOURAUD
+static char MODULE_VertexFileName[ 512 ] = "test.v" ;
+static void DebugWriteVertexSetFileName( const char* a_FileName )
+{
+	char* p;
+	strcpy( MODULE_VertexFileName, a_FileName ) ;
+	p = strrchr( MODULE_VertexFileName, '.' ) ;
+	if( p )
+	{
+		strcpy( p, ".V" ) ;
+	}
+}
+static void DebugWriteVertex( const geVec3d* a_Vert, const geVec3d* a_Normal, 
+	const geVec3d* a_Color, int a_LightsCount, Light_DirectLight** a_LightsFound )
+{
+	static bool firstTime = true ;
+	const char* name = MODULE_VertexFileName ;
+	FILE* fp ;
+	
+	if (firstTime) {
+		firstTime = false ;
+		fp = fopen( name, "w" ) ;
+		// write verion number
+		fprintf( fp, "%f ", 1.0f ) ;
+	}
+	else {
+		fp = fopen( name, "a" ) ;
+	}
+
+	if ( fp ) {
+		geVec3d color ;
+
+		fprintf( fp, "%f %f %f ", a_Vert->X, a_Vert->Y, a_Vert->Z ) ;
+
+		// give the color the same treatment as FinalizeRGBVerts() would
+		color = *a_Color ;
+		FinalizeRGBVert( &color ) ;
+		fprintf( fp, "%f %f %f ", color.X, color.Y, color.Z ) ;
+
+		fprintf( fp, "%f %f %f ", a_Normal->X, a_Normal->Y, a_Normal->Z ) ;
+		// write light count
+		fprintf( fp, "%d ", a_LightsCount ) ;
+		for( int i = 0 ; i < a_LightsCount ; i ++ )
+		{
+			// write light position
+			fprintf( fp, "%f %f %f ", 
+				a_LightsFound[ i ]->Origin.X, 
+				a_LightsFound[ i ]->Origin.Y, 
+				a_LightsFound[ i ]->Origin.Z ) ;
+		}
+		fprintf( fp, "\n" ) ;
+		fclose( fp ) ;
+		fp = NULL ;
+	}
+}
+#endif
+
+
 //====================================================================================
 //	GouraudShadeFace
 //====================================================================================
@@ -577,20 +780,34 @@ geBoolean GouraudShadeFace(int32 FaceNum)
 	int32				v;
 	GFX_TexInfo			*pGFXTexInfo;
 
+
 	if (!GFXRGBVerts || !NumGFXRGBVerts)
+	{
+#if DEBUG_RWM_GOURAUD
+		GHook.Printf("DON'T GouraudShadeFace()\n") ;
+#endif
 		return GE_FALSE;
+	}
 
 	pGFXFace = &GFXFaces[FaceNum];
 	
 	pGFXTexInfo = &GFXTexInfo[pGFXFace->TexInfo];
 
 	NumVerts = pGFXFace->NumVerts;
+	
 
 	for (v=0; v< pGFXFace->NumVerts; v++)
 	{
 		int32		vn, Index, i;
-		geVec3d		*pVert, Normal;
+		geVec3d		*pVert, Normal ;
 		float		Dist, Angle, Val, Intensity;
+#if DEBUG_RWM_GOURAUD
+		int lightsCount ;
+		#define MAX_LIGHTS 250
+		Light_DirectLight* lightsFound[ MAX_LIGHTS ] ;
+
+		lightsCount = 0 ;
+#endif
 
 		vn = pGFXFace->FirstVert+v;
 
@@ -598,11 +815,38 @@ geBoolean GouraudShadeFace(int32 FaceNum)
 
 		pVert = &GFXVerts[Index];
 
+#if RWM_GOURAUD
+		
+		Normal = FaceInfo[FaceNum].Plane.Normal;
+		
+		#if DEBUG_RWM_GOURAUD
+		/*
+		if (pGFXTexInfo->Flags & TEXINFO_FLAT)
+		{
+			GHook.Printf("Found FLAT shaded face\n" ) ;
+		}
+		*/
+		#endif
+
+#else
 		if (pGFXTexInfo->Flags & TEXINFO_FLAT)
 			Normal = FaceInfo[FaceNum].Plane.Normal;
 		else
 			Normal = VertNormals[Index];
-		
+#endif	
+
+		if( GFXTexInfo[GFXFaces[FaceNum].TexInfo].Flags & TEXINFO_FULLBRIGHT )
+		{
+			GFXRGBVerts[vn].X = 255 ;			
+			GFXRGBVerts[vn].Y = 255 ;			
+			GFXRGBVerts[vn].Z = 255 ;			
+			#if DEBUG_RWM_GOURAUD
+			DebugWriteVertex( pVert, &Normal, &GFXRGBVerts[vn], 0, NULL ) ;
+			#endif
+			continue ; // NOTE: (!)
+		}
+
+
 		for (i=0; i< NumDirectLights; i++)
 		{
 			geVec3d	Vect;
@@ -618,11 +862,40 @@ geBoolean GouraudShadeFace(int32 FaceNum)
 
 			Angle = geVec3d_DotProduct(&Vect, &Normal);
 
-			if (Angle <= 0.001f)							
+			Val = 0 ;
+
+			// Wismerhill
+			if (DLight->Type != DLight_SunLight && Angle <= 0.001f) 							
 				goto Skip;
 				
 			switch(DLight->Type)
 			{
+			// Wismerhill
+				case DLight_SunLight:
+   				{
+   					// Find the angle between the light normal, and the face normal
+   					Angle = -geVec3d_DotProduct(&DLight->Normal, &Normal);
+					Val = Intensity * Angle;
+   					break;
+   				}
+   
+				// LWM: start
+				case DLight_Sun:
+				{
+#if 0 // #if RWM_GOURAUD
+					float l_r = 1.25f * DLight->SunFallOffRadiusInTexels ;
+					float l_v ;
+					if ( Dist < l_r ) 
+						l_v = 1.25f * ( l_r - Dist ) / l_r  ;
+					else
+						l_v = 0.0f ;
+					Val = l_v * Intensity * Angle; //(Angle*0.5f+0.5f);
+#else
+					Val = 1.25f * SunCalcLightValue( DLight, Dist, Angle, Intensity, false ) ;
+#endif
+					break ;
+				}
+				// LWM: end
 				case DLight_Point:
 				{
 					Val = (Intensity - Dist) * Angle;//(Angle*0.5f+0.5f);
@@ -656,16 +929,186 @@ geBoolean GouraudShadeFace(int32 FaceNum)
 
 			if (Val <= 0.0f)
 				goto Skip;
+			// Wismerhill
+			if(DLight->Type == DLight_SunLight) 
+			{
+				geVec3d_AddScaled(pVert, &DLight->Normal, -20000.0f, &Vect);			//SMALL CORRECTION
+  				if (RayCollisionButSky(pVert, &Vect, NULL))
+  					goto Skip; // Ray is in shadow
+			}
+			else
+			{
+  				Vect = DLight->Origin;
+  				if (RayCollision(pVert, &Vect, NULL))
+  					goto Skip; // Ray is in shadow
+			}
+   
+#if RWM_GOURAUD
+			// allow some obstructions 
+			{
+				geVec3d n ; // normalized normal
+				geVec3d test ; // point to test for visibility of the light
+				geVec3d x, y, crossWith ; // to build x,y axis in plane
+				int dist ; // counter
+				#define NR_DISTANCES 4
+				#define USE_NR_DISTANCES 3
+				float texels[ NR_DISTANCES ] =      { 2.0f, 5.0f, 20.0f, 40.0f } ; // distance from plane
+				float intensities[ NR_DISTANCES ] = { 1.0f, 0.9f,  0.7f,  0.5f } ; // intensityfactor
+				float result = 0 ; // resulting Val
+				int found = 0 ;
 
+				n = Normal ; 
+				geVec3d_Normalize( &n ) ;
+
+				// see if Y-axis is OK for crossproduct
+				crossWith.X = 0.0f ;
+				crossWith.Y = 1.0f ;
+				crossWith.Z = 0.0f ;
+				if( geVec3d_Compare( &crossWith, &n, 0.1f ) )
+				{
+					// try Z-axis for crossproduct
+					crossWith.X = 0.0f ;
+					crossWith.Y = 0.0f ;
+					crossWith.Z = 1.0f ;
+				}
+
+				// build X and Y axis inside plane
+				geVec3d_CrossProduct( &n, &crossWith, &x ) ;
+				geVec3d_Normalize( &x ) ;
+				geVec3d_CrossProduct( &n, &x, &y ) ;
+				geVec3d_Normalize( &y ) ;
+
+				for( dist = 0 ; dist < USE_NR_DISTANCES ; dist ++ )
+				{
+					int	quadrant ;
+					float XY_SCALE = texels[ dist ] / 2.0f ;
+
+					for( quadrant = 0 ; quadrant < 5 ; quadrant ++ )
+					{
+						// create a test point somewhat removed from the face
+						// and somewhat away from the direction the normal points in
+						// to avoid getting inside planes nearby
+						int sunQuadrant ;
+						#define SUN_SIZE 32.0f
+
+						geVec3d_AddScaled( pVert, &n, texels[ dist ], &test ) ;
+						switch( quadrant )
+						{
+							case 0 :
+								geVec3d_AddScaled( &test, &x, +1.0f * XY_SCALE, &test ) ;
+								geVec3d_AddScaled( &test, &y, +1.0f * XY_SCALE, &test ) ;
+								break ;
+							case 1 :
+								geVec3d_AddScaled( &test, &x, -1.0f * XY_SCALE, &test ) ;
+								geVec3d_AddScaled( &test, &y, +1.0f * XY_SCALE, &test ) ;
+								break ;
+							case 2 :
+								geVec3d_AddScaled( &test, &x, -1.0f * XY_SCALE, &test ) ;
+								geVec3d_AddScaled( &test, &y, -1.0f * XY_SCALE, &test ) ;
+								break ;
+							case 3 :
+								geVec3d_AddScaled( &test, &x, +1.0f * XY_SCALE, &test ) ;
+								geVec3d_AddScaled( &test, &y, -1.0f * XY_SCALE, &test ) ;
+								break ;
+							case 4 :
+								// straight up along normal
+								break ;
+						}
+#if 1
+						// just use the origin of the light
+						for( sunQuadrant = 0 ; sunQuadrant < 1 ; sunQuadrant ++ )
+#else
+						// check some points around the light too
+						for( sunQuadrant = 0 ; sunQuadrant < 9 ; sunQuadrant ++ )
+#endif
+						{
+							// see if this testpoint can see the light
+							geVec3d origin ;
+
+							origin = DLight->Origin ;
+							switch( sunQuadrant )
+							{
+								case 0 :
+									// just take origin
+									break ;
+								case 1 :
+								case 2 :
+									origin.X -= SUN_SIZE ;
+									origin.Z -= SUN_SIZE ;
+									break ;
+								case 3 :
+								case 4 :
+									origin.X += SUN_SIZE ;
+									origin.Z -= SUN_SIZE ;
+									break ;
+								case 5 :
+								case 6 :
+									origin.X += SUN_SIZE ;
+									origin.Z += SUN_SIZE ;
+									break ;
+								case 7 :
+								case 8 :
+									origin.X -= SUN_SIZE ;
+									origin.Z += SUN_SIZE ;
+									break ;
+							}
+							if( sunQuadrant > 0 )
+							{
+								if( sunQuadrant % 2 )
+								{
+									origin.Y -= SUN_SIZE ;
+								}
+								else
+								{
+									origin.Y += SUN_SIZE ;
+								}
+							}
+							if (  (DLight->SunRGBAlwaysVisible)
+							||    (! RayCollision(&test, &origin, NULL))
+							) {
+								// yes
+								result = Val * intensities[ dist ] ;
+								found = 1 ;
+								break ;
+							}
+						}
+						if( found )
+						{
+							break ;
+						}
+					}
+					if( found )
+					{
+						break ;
+					}
+				}
+				if( ! found )
+				{
+					goto Skip;
+				}
+				Val = result ;
+			}
+#else
 			// This is the slowest test, so make it last
 			if (RayCollision(pVert, &DLight->Origin, NULL))
 				goto Skip;	// Ray is in shadow
+#endif
 
 			geVec3d_AddScaled(&GFXRGBVerts[vn], &DLight->Color, Val, &GFXRGBVerts[vn]);
-					
+			
+			#if DEBUG_RWM_GOURAUD
+			// remember light found
+			if( lightsCount < MAX_LIGHTS )
+			{
+				lightsFound[ lightsCount ++ ] = DLight ;
+			}
+			#endif
 			Skip:;
 		
 		}
+		#if DEBUG_RWM_GOURAUD
+		DebugWriteVertex( pVert, &Normal, &GFXRGBVerts[vn], lightsCount, lightsFound ) ;
+		#endif
 	}
 
 	return GE_TRUE;
@@ -745,12 +1188,28 @@ geBoolean ApplyLightsToFace(FInfo *FaceInfo, LInfo *LightInfo, float Scale)
 				Dist = geVec3d_Normalize(&Vect);
 
 				Angle = geVec3d_DotProduct(&Vect, &Normal);
-
-				if (Angle <= 0.001f)							
+				// Wismerhill
+				if (DLight->Type != DLight_SunLight && Angle <= 0.001f) //no skip    if it's a sun
+							
 					goto Skip;
 				
 				switch(DLight->Type)
 				{
+					// Wismerhill
+					case DLight_SunLight:
+   					{
+		   				// Find the angle between the light normal, and the face normal
+		   				Angle = -geVec3d_DotProduct(&DLight->Normal, &Normal);
+		 				Val = Intensity * Angle;
+		 				break;
+   					}
+					// LWM: start
+					case DLight_Sun:
+					{
+						Val = SunCalcLightValue( DLight, Dist, Angle, Intensity, true ) ;
+						break ;
+					}
+					// LWM: end
 					case DLight_Point:
 					{
 						Val = (Intensity - Dist) * Angle;
@@ -785,9 +1244,21 @@ geBoolean ApplyLightsToFace(FInfo *FaceInfo, LInfo *LightInfo, float Scale)
 				if (Val <= 0.0f)
 					goto Skip;
 
-				// This is the slowest test, so make it last
-				if (RayCollision(&Verts[v], &DLight->Origin, NULL))
-					goto Skip;	// Ray is in shadow
+				// Wismerhill
+				// Test if the ray is in shadow with a collision test between a lighted point    and the light
+				if(DLight->Type == DLight_SunLight)
+				{
+	 				//simulate a veeeeery far light
+   					geVec3d_AddScaled(&Verts[v], &DLight->Normal, -20000.0f, &Vect);
+   					if (RayCollisionButSky(&Verts[v], &Vect, NULL))
+   						goto Skip; // Ray is in shadow
+				} 
+				else
+				{
+   					Vect = DLight->Origin;
+   					if (RayCollision(&Verts[v], &Vect, NULL))
+	   					goto Skip; // Ray is in shadow
+				}
 
 				LType = DLight->LType;
 
@@ -1353,6 +1824,68 @@ geBoolean RayCollision(geVec3d *Front, geVec3d *Back, geVec3d *I)
 	return GE_FALSE;
 }
 
+// Wismerhill
+#define COLLISION_BOX 1.0f
+geBoolean RayCollisionButSky(geVec3d *Front, geVec3d *Back, geVec3d *I)
+{
+   HitLeaf = GE_FALSE;
+   if (RayIntersect(Front, Back, GFXModels[0].RootNode[0]))
+   {
+	   if(HitLeaf)
+		{
+			GFX_Node *pNode;
+		   	GFX_Face *pFace;
+		   	int32 i, k, v, *pIndex;
+		   	geVec3d VMins, VMaxs;
+		   	geVec3d Vert;
+	 		pNode = &GFXNodes[GlobalNode];
+		   	pFace = &GFXFaces[pNode->FirstFace];
+	 		//this code retrieves the face that we hit
+		   	//by calculating its coords and testing if the impact point is in
+		   	for(i=0;i<pNode->NumFaces;i++,pFace++)
+		   	{
+		   		//dummy mins/maxs
+		   		for (k=0; k<3; k++)
+		   		{
+		   			VectorToSUB(VMins, k) = 99999.0f;
+		   			VectorToSUB(VMaxs, k) =-99999.0f;
+		   		}
+				//points into the list of index for this face
+		   		pIndex = &GFXVertIndexList[pFace->FirstVert];
+	 			//loop through vertices of the face
+		   		for (v=0; v < pFace->NumVerts; v++, pIndex++)
+		   		{
+		   			//extract the vertex vector
+		   			Vert = GFXVerts[*pIndex];
+					//compute mins/maxs
+		   			for (k=0; k<3; k++)
+		   			{
+		   				if (VectorToSUB(Vert, k) < VectorToSUB(VMins, k))
+		   					VectorToSUB(VMins, k) = VectorToSUB(Vert, k);
+		   				if (VectorToSUB(Vert, k) > VectorToSUB(VMaxs, k))
+		   					VectorToSUB(VMaxs, k) = VectorToSUB(Vert, k);
+		   			}
+		   		}
+	 			//Mins & Maxs are calculated for this face
+		   		//is the Impact on it?
+		   		if (GlobalI.X + COLLISION_BOX >= VMins.X && GlobalI.X - COLLISION_BOX    <= VMaxs.X)
+		   		if (GlobalI.Y + COLLISION_BOX >= VMins.Y && GlobalI.Y - COLLISION_BOX    <= VMaxs.Y)
+		   		if (GlobalI.Z + COLLISION_BOX >= VMins.Z && GlobalI.Z - COLLISION_BOX    <= VMaxs.Z)
+		   		{ //yes! It's our face 
+		   			if(GFXTexInfo[pFace->TexInfo].Flags & TEXINFO_SKY) { //is it face marked    sky?
+		   				return GE_FALSE; //undo the collision: sunlight must pass
+		   			}
+		   		}
+	   		}
+		}
+
+		if (I) 
+	   		*I = GlobalI; // Set the intersection point
+   	return GE_TRUE;
+  	}
+return GE_FALSE;
+}
+
 //================================================================================
 //	StartWriting
 //================================================================================
@@ -1504,6 +2037,19 @@ void FreeDirectLight(Light_DirectLight *DLight)
 	geRam_Free(DLight);
 }
 
+geBoolean StringContains( const char* a_String, const char* a_SubStr )
+{
+	char stringBuf[ 512 ];
+	char subStrBuf[ 512 ];
+	memset( stringBuf, 0, sizeof( stringBuf ) ) ;
+	memset( subStrBuf, 0, sizeof( subStrBuf ) ) ;
+	strncpy( stringBuf, a_String, sizeof( stringBuf ) ) ;
+	strncpy( subStrBuf, a_SubStr, sizeof( subStrBuf ) ) ;
+	strupr( stringBuf ) ; 
+	strupr( subStrBuf ) ;
+	return strstr( stringBuf, subStrBuf ) != NULL ;
+}
+
 //========================================================================================
 //	CreateDirectLights
 //========================================================================================
@@ -1519,6 +2065,9 @@ geBoolean CreateDirectLights(void)
 	geXForm3d			XForm;
 	GFX_TexInfo			*pTexInfo;
 	int32				NumSurfLights;
+	int					rgbOnlyCount = 0 ;
+	int					rgbAlwaysVisibleCount = 0 ;
+	int					SunsWithoutRadiusCount = 0 ;
 
 	NumDirectLights = 0;
 	NumSurfLights = 0;
@@ -1585,6 +2134,166 @@ geBoolean CreateDirectLights(void)
 			DLight->Type = DLight_Point;
 		else if (!stricmp(Entity->ClassName, "SpotLight"))
 			DLight->Type = DLight_Spot;
+		// Wismerhill
+		else if (!stricmp(Entity->ClassName, "SunLight"))
+			DLight->Type = DLight_SunLight;
+		// LWM: start
+		else if (!stricmp(Entity->ClassName, "Sun"))
+		{
+			char* name ;
+
+			DLight->Type = DLight_Sun;
+
+			// ================== DaviName
+
+			DLight->SunRGBOnly = false ;
+			if( strcmpi( ValueForKey( Entity, name = "DaviName" ), "" ) )
+			{				
+				char* daviName = ValueForKey( Entity, name ) ;
+
+				if( StringContains( daviName, "rgb" ) )
+				{
+					DLight->SunRGBOnly = true ;
+					rgbOnlyCount ++ ;
+				}
+			}
+
+			DLight->SunRGBAlwaysVisible = false ;
+			if( (DLight->SunRGBOnly)
+			&&  (strcmpi( ValueForKey( Entity, name = "DaviName" ), "" ))
+			) {				
+				char* daviName = ValueForKey( Entity, name ) ;
+				if( StringContains( daviName, "visible" ) )
+				{
+					DLight->SunRGBAlwaysVisible = true ;
+					rgbAlwaysVisibleCount ++ ;
+				}
+			}
+
+			if( DLight->SunFallOffRadiusInTexels < 0.0f )
+			{
+				GHook.Printf("*WARNING* Invalid Sun %s %f.\n", 
+								(const char*) name,
+					            (float) DLight->SunFallOffRadiusInTexels 
+				);
+				DLight->SunFallOffRadiusInTexels = 32.0f ;
+			}
+			// ================== FallOffType
+			
+			// test if entity has "FallOffType" field
+			if( strcmp( ValueForKey( Entity, name = "FallOffType" ), "" ) )
+			{
+				// let's hope it is an integer...
+				DLight->SunFallOffType = atoi( ValueForKey( Entity, name ) ) ;
+				if( DLight->SunFallOffType < SUN_MIN_FALLOFF_TYPE 
+				||  DLight->SunFallOffType > SUN_MAX_FALLOFF_TYPE 
+				) {
+					GHook.Printf("*WARNING* Invalid Sun %s %d.\n", 
+							(const char*) name,
+						    (int) DLight->SunFallOffType 
+					);
+				}
+				if( DLight->SunFallOffType==SUN_FALLOFF_NONE )
+				{
+					SunsWithoutRadiusCount ++ ;
+				}
+			}
+			else
+			{
+				// field doesn't exist
+				GHook.Printf("*WARNING* Sun has no %s.\n", 
+					(const char*) name
+				);
+				DLight->SunFallOffType = SUN_MIN_FALLOFF_TYPE ;
+			}
+
+			// ================== FallOffRadiusInTexels
+
+			if( strcmpi( ValueForKey( Entity, name = "FallOffRadiusInTexels" ), "" ) )
+			{				
+				// let's hope it is a float
+				DLight->SunFallOffRadiusInTexels = FloatForKey( Entity, name ) ;
+			}
+			else
+			{
+				// field doesn't exist
+				GHook.Printf("*WARNING* Sun has no %s.\n", 
+					(const char*) name
+				);
+				DLight->SunFallOffRadiusInTexels = 32.0f ;
+			}
+			if( DLight->SunFallOffRadiusInTexels < 0.0f )
+			{
+				GHook.Printf("*WARNING* Invalid Sun %s %f.\n", 
+								(const char*) name,
+					            (float) DLight->SunFallOffRadiusInTexels 
+				);
+				DLight->SunFallOffRadiusInTexels = 32.0f ;
+			}
+			
+			
+			// ================== FallOffRadiusTopIntensity
+
+			if( strcmpi( ValueForKey( Entity, name = "FallOffRadiusTopIntensity" ), "" ) )
+			{				
+				// let's hope it is a float
+				DLight->SunFallOff100PercentRadius = FloatForKey( Entity, name ) ;
+
+			}
+			else
+			{
+				// field doesn't exist
+				GHook.Printf("*WARNING* Sun has no %s.\n", 
+					(const char*) name
+				);
+				DLight->SunFallOff100PercentRadius = 0 ;
+			}
+			if( DLight->SunFallOff100PercentRadius < 0.0f
+			||  DLight->SunFallOff100PercentRadius > DLight->SunFallOffRadiusInTexels
+			) {
+				GHook.Printf("*WARNING* Invalid Sun %s %f.\n", 
+					(const char*) name,
+					(float) DLight->SunFallOff100PercentRadius
+				);
+				DLight->SunFallOff100PercentRadius = 0 ;
+			}
+
+			// ================== FallOffSecretNumber
+
+			if( strcmpi( ValueForKey( Entity, name = "FallOffSecretNumber" ), "" ) )
+			{				
+				// let's hope it is a float
+				DLight->SunFallOffAlpha = FloatForKey( Entity, name ) ;
+
+			}
+			else
+			{
+				// field doesn't exist
+				GHook.Printf("*WARNING* Sun has no %s.\n", 
+					(const char*) name
+				);
+				DLight->SunFallOffAlpha = 1.0f ;
+			}
+			
+			if( DLight->SunFallOffAlpha < 0.0f 
+			||  DLight->SunFallOffAlpha > 100.0f )
+			{
+				GHook.Printf("*ERROR* Invalid Sun %s %f.\n", 
+					(const char*) name,
+					(float) DLight->SunFallOffAlpha
+				);
+				DLight->SunFallOffAlpha = 1.0f ;
+			}
+
+
+#if DEBUG_SUN
+			GHook.Printf("*DEBUG* Sun SunFallOffType %d.\n", (int) DLight->SunFallOffType );
+			GHook.Printf("*DEBUG* Sun SunFallOffRadiusInTexels %f.\n", (float) DLight->SunFallOffRadiusInTexels );
+			GHook.Printf("*DEBUG* Sun SunFallOff100PercentRadius %f.\n", (float) DLight->SunFallOff100PercentRadius );
+			GHook.Printf("*DEBUG* Sun SunFallOffAlpha %f.\n", (float) DLight->SunFallOffAlpha );
+#endif
+		}
+		// LWM: end
 			
 
 		Leaf = FindGFXLeaf(0, &Entity->Origin);
@@ -1610,6 +2319,9 @@ geBoolean CreateDirectLights(void)
 	}
 
 	GHook.Printf("Num Normal Lights   : %5i\n", NumDirectLights);
+	GHook.Printf("Num RGB only Lights   : %5i\n", rgbOnlyCount );
+	GHook.Printf("Num RGB Always Visible Lights   : %5i\n", rgbAlwaysVisibleCount );
+	GHook.Printf("Num Suns with fallofftype 0 : %5i\n", SunsWithoutRadiusCount ) ;
 
 	if (!DoRadiosity)		// Stop here if no radisosity is going to be done
 		return GE_TRUE;
@@ -1696,3 +2408,4 @@ void FreeDirectLights(void)
 
 	NumDirectLights = 0;
 }
+

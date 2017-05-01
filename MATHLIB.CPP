@@ -46,7 +46,7 @@ void ClearBounds(geVec3d *Mins, geVec3d *Maxs)
 void AddPointToBounds(geVec3d *v, geVec3d *Mins, geVec3d *Maxs)
 {
 	int32	i;
-	float 	Val;
+	geFloat 	Val;
 
 	for (i=0 ; i<3 ; i++)
 	{
@@ -64,7 +64,7 @@ void AddPointToBounds(geVec3d *v, geVec3d *Mins, geVec3d *Maxs)
 //=======================================================================================
 geFloat ColorNormalize(geVec3d *C1, geVec3d *C2)
 {
-	float	Max;
+	geFloat	Max;
 
 	Max = C1->X;
 	if (C1->Y > Max)
@@ -86,7 +86,7 @@ geFloat ColorNormalize(geVec3d *C1, geVec3d *C2)
 geFloat ColorClamp(geVec3d *C1, geFloat Clamp, geVec3d *C2)
 {
 	int32	i;
-	float	Max, Max2;
+	geFloat	Max, Max2;
 	geVec3d	C3;
 
 	Max = -1.0f;
@@ -117,11 +117,11 @@ geFloat ColorClamp(geVec3d *C1, geFloat Clamp, geVec3d *C2)
 //=======================================================================================
 int32 geVec3d_PlaneType(geVec3d *V1)
 {
-	float	X, Y, Z;
+	geFloat	X, Y, Z;
 
-	X = (float)fabs(V1->X);
-	Y = (float)fabs(V1->Y);
-	Z = (float)fabs(V1->Z);
+	X = (geFloat)fabs(V1->X);
+	Y = (geFloat)fabs(V1->Y);
+	Z = (geFloat)fabs(V1->Z);
 
 	if (X == 1.0f)
 		return PLANE_X;

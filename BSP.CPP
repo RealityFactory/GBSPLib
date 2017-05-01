@@ -404,9 +404,9 @@ int32 FindPlane(GBSP_Plane *Plane, int32 *Side)
 
 //=======================================================================================
 //=======================================================================================
-float _fastcall Plane_PointDistanceFast(GBSP_Plane *Plane, geVec3d *Point)
+geFloat _fastcall Plane_PointDistanceFast(GBSP_Plane *Plane, geVec3d *Point)
 {
-   float	Dist,Dist2;
+   geFloat	Dist,Dist2;
 
    Dist2 = Plane->Dist;
 

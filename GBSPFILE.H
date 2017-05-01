@@ -67,7 +67,7 @@
 
 #define GBSP_CHUNK_END				0xffff
 
-#define MAX_GBSP_ENTDATA			200000
+#define MAX_GBSP_ENTDATA			200000*2
 
 //*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 //	IF THESE FLAGS CHANGE, THEY MUST CHANGE IN GBSPFILE.H in Genesis AND GBSPLIB!!!!!
@@ -154,9 +154,9 @@ typedef struct
 typedef struct
 {
 	geVec3d			Axis;						// Axis of rotation
-	float			Dpm;						// Degres per minute
+	geFloat			Dpm;						// Degres per minute
 	int32			Textures[6];				// Texture indexes for all six sides...
-	float			DrawScale;
+	geFloat			DrawScale;
 } GFX_SkyData;
 
 typedef struct
@@ -270,13 +270,13 @@ typedef struct
 typedef struct
 {
 	geVec3d			Vecs[2];
-	float			Shift[2];
-	float			DrawScale[2];
+	geFloat			Shift[2];
+	geFloat			DrawScale[2];
 	int32			Flags;
-	float			FaceLight;
-	float			ReflectiveScale;
-	float			Alpha;
-	float			MipMapBias;
+	geFloat			FaceLight;
+	geFloat			ReflectiveScale;
+	geFloat			Alpha;
+	geFloat			MipMapBias;
 	int32			Texture;
 } GFX_TexInfo;
 

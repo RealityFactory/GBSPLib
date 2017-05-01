@@ -76,12 +76,12 @@ void SetKeyValue (MAP_Entity *Ent, char *Key, char *Value)
 
 //=====================================================================================
 //=====================================================================================
-float FloatForKey (MAP_Entity *Ent, char *Key)
+geFloat FloatForKey (MAP_Entity *Ent, char *Key)
 {
 	char	*k;
 	
 	k = ValueForKey (Ent, Key);
-	return (float)atof(k);
+	return (geFloat)atof(k);
 }
 
 //=====================================================================================
@@ -340,7 +340,7 @@ geBoolean LoadEntityData(geVFile *VFile)
 			}
 			else if (!strcmp(Epair->Key, "Angle"))
 			{
-				Entity->Angle = (float)atof(Epair->Value);
+				Entity->Angle = (geFloat)atof(Epair->Value);
 			}
 			
 			if (Entity->Light < 0 || Entity->Light > 2500)

@@ -648,7 +648,7 @@ void SortPortals(void)
 //================================================================================
 geBoolean CalcPortalInfo(VIS_Portal *Portal)
 {
-	float		BestDist, Dist;
+	geFloat		BestDist, Dist;
 	GBSP_Poly	*Poly;
 	geVec3d		Vect;
 	int32			i;

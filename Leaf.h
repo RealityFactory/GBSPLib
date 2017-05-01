@@ -26,7 +26,7 @@
 
 #include "BSP.h"
 
-#define MAX_LEAF_SIDES	64000*2
+#define MAX_LEAF_SIDES	64000*4
 
 
 extern int32				NumLeafClusters;

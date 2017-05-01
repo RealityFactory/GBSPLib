@@ -41,7 +41,7 @@
 geVec3d	TreeMins;
 geVec3d	TreeMaxs;
 
-float	MicroVolume = 0.1f;
+geFloat	MicroVolume = 0.1f;
 int32	NumVisNodes, NumNonVisNodes;
 
 extern int32	NumMerged;

@@ -27,9 +27,9 @@
 #include "BSP.h"
 #include "Motion.h"
 
-#define MAX_MAP_ENTITIES			4096
-#define MAX_MAP_TEXINFO				8192
-#define MAX_MAP_TEXTURES			1024
+#define MAX_MAP_ENTITIES			4096*2
+#define MAX_MAP_TEXINFO				8192*2
+#define MAX_MAP_TEXTURES			1024*2
 
 #pragma pack(1)
 
@@ -49,15 +49,15 @@ typedef struct
 typedef struct
 {
 	int32		Flags;
-	float		MipMapBias;
-	float		Alpha;					// Alpha for brush
-	float		FaceLight;				// Light intensity for face light
-	float		ReflectiveScale;
+	geFloat		MipMapBias;
+	geFloat		Alpha;					// Alpha for brush
+	geFloat		FaceLight;				// Light intensity for face light
+	geFloat		ReflectiveScale;
 	char		TexName[32];
-	float		uVecX, uVecY, uVecZ;
-	float		DrawScaleX, OffsetX;
-	float		vVecX, vVecY, vVecZ;
-	float		DrawScaleY, OffsetY;
+	geFloat		uVecX, uVecY, uVecZ;
+	geFloat		DrawScaleX, OffsetX;
+	geFloat		vVecX, vVecY, vVecZ;
+	geFloat		DrawScaleY, OffsetY;
 
 } MAP_FaceHeader;
 
@@ -86,7 +86,7 @@ typedef struct
 	// For light stage
 	char			ClassName[64];
 	geVec3d			Origin;				// Well, this is used everywhere...
-	float			Angle;
+	geFloat			Angle;
 	int32			Light;
 	int32			LType;
 	char			Target[32];
@@ -103,7 +103,7 @@ extern	MAP_Entity	Entities[MAX_MAP_ENTITIES];
 //=====================================================================================
 char		*ValueForKey(MAP_Entity *Ent, char *Key);
 void		SetKeyValue(MAP_Entity *Ent, char *Key, char *Value);
-float		FloatForKey(MAP_Entity *Ent, char *Key);
+geFloat		FloatForKey(MAP_Entity *Ent, char *Key);
 void		GetVectorForKey(MAP_Entity *Ent, char *Key, geVec3d *Vec);
 geBoolean	GetVectorForKey2(MAP_Entity *Ent, char *Key, geVec3d *Vec);
 void		GetColorForKey(MAP_Entity *Ent, char *Key, geVec3d *Vec);

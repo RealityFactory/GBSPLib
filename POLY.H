@@ -43,7 +43,7 @@ geBoolean	SplitPoly(GBSP_Poly *InPoly, GBSP_Plane *Plane, GBSP_Poly **Front, GBS
 			   geBoolean FlipTest);
 geBoolean	SplitPolyEpsilon(GBSP_Poly *InPoly, geFloat Epsilon, GBSP_Plane *Plane, GBSP_Poly **Front, GBSP_Poly **Back, 
 			   geBoolean FlipTest);
-float		PolyArea(GBSP_Poly *Poly);
+geFloat		PolyArea(GBSP_Poly *Poly);
 geBoolean	CopyPoly(GBSP_Poly *In, GBSP_Poly **Out);
 GBSP_Poly	*CopyPoly2(GBSP_Poly *In);
 geBoolean	ReversePoly(GBSP_Poly *In, GBSP_Poly **Out);
@@ -67,6 +67,6 @@ geBoolean	CheckFace(GBSP_Face *Face, geBoolean Verb);
 void		GetFaceListBOX(GBSP_Face *Faces, geVec3d *Mins, geVec3d *Maxs);
 
 extern int32	NumSubdivides;
-extern float	SubdivideSize;
+extern geFloat	SubdivideSize;
 
 #endif

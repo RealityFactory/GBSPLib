@@ -36,7 +36,7 @@ typedef struct _VIS_Portal
 	GBSP_Poly	*Poly;					// Convex poly shape of portal
 	GBSP_Plane	Plane;					// Plane of portal
 	geVec3d		Center;					// Center of portal
-	float		Radius;					// Radius of portal (Fromt Center to a vert)
+	geFloat		Radius;					// Radius of portal (Fromt Center to a vert)
 
 	uint8		*VisBits;				// What leafs portal might can see (byte compressed)
 	uint8		*FinalVisBits;			// What leafs portal really can see (byte compressed)
@@ -55,7 +55,7 @@ typedef struct
 } VIS_Leaf;
 
 
-#define MAX_TEMP_PORTALS		25000
+#define MAX_TEMP_PORTALS		25000*2
 
 typedef struct
 {

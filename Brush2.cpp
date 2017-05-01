@@ -89,7 +89,7 @@ MAP_Brush *LoadMapBrush(geVFile *VFile)
 	GFX_TexInfo		Tx;
 	
 	GBSP_Plane		Plane;
-	float			FDist;
+	geFloat			FDist;
 	geVec3d			VertF;
 			
 	// Get the number of faces
@@ -125,7 +125,7 @@ MAP_Brush *LoadMapBrush(geVFile *VFile)
 			return NULL;
 		}
 
-		if (!geVFile_Read(VFile, &FDist, sizeof(float)))
+		if (!geVFile_Read(VFile, &FDist, sizeof(geFloat)))
 		{
 			GHook.Error("LoadMapBrush:  Could not read face plane dist.\n");
 			FreeMapBrush(Brush);
@@ -185,7 +185,7 @@ MAP_Brush *LoadMapBrush(geVFile *VFile)
 		Tx.DrawScale[0] = FaceHeader.DrawScaleX;
 		Tx.DrawScale[1] = FaceHeader.DrawScaleY;
 
-		Tx.FaceLight = (float)FaceHeader.FaceLight;
+		Tx.FaceLight = (geFloat)FaceHeader.FaceLight;
 		Tx.Flags = FaceHeader.Flags;
 
 		// Don't allow alpha values on faces that don't have the TRANS flag set...
@@ -193,7 +193,7 @@ MAP_Brush *LoadMapBrush(geVFile *VFile)
 			FaceHeader.Alpha = 255.0f;
 
 		// Copy the brush's alpha directly over to the faces texinfo
-		Tx.Alpha = (float)FaceHeader.Alpha;
+		Tx.Alpha = (geFloat)FaceHeader.Alpha;
 		Tx.MipMapBias = FaceHeader.MipMapBias;
 		Tx.ReflectiveScale = FaceHeader.ReflectiveScale;
 

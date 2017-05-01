@@ -33,9 +33,9 @@
 #include "Ram.h"
 
 int32		NumSubdivides;
-float		SubdivideSize = 235.0f;
-//float		SubdivideSize = ((float)((16*MAX_LMAP_SIZE)-20));
-//float		SubdivideSize = ((float)((16*MAX_LMAP_SIZE)-32));
+geFloat		SubdivideSize = 235.0f;
+//geFloat		SubdivideSize = ((geFloat)((16*MAX_LMAP_SIZE)-20));
+//geFloat		SubdivideSize = ((geFloat)((16*MAX_LMAP_SIZE)-32));
 
 int32		NumSubdivided;
 int32		NumMerged;
@@ -137,7 +137,7 @@ geBoolean TextureAxisFromPlane(GBSP_Plane *Pln, geVec3d *Xv, geVec3d *Yv)
 	
 	for (i=0 ; i<3 ; i++)
 	{
-		Dot = (float)fabs(VectorToSUB(Pln->Normal, i));
+		Dot = (geFloat)fabs(VectorToSUB(Pln->Normal, i));
 		if (Dot > Best)
 		{
 			Best = Dot;
@@ -943,7 +943,7 @@ geBoolean RemoveDegenerateEdges2(GBSP_Poly *Poly)
 //====================================================================================
 //	PolyArea
 //====================================================================================
-float PolyArea(GBSP_Poly *Poly)
+geFloat PolyArea(GBSP_Poly *Poly)
 {
 	int32	i;
 	geVec3d	Vect1, Vect2, Cross;
@@ -959,7 +959,7 @@ float PolyArea(GBSP_Poly *Poly)
 		Total += (geFloat)0.5 * geVec3d_Length(&Cross);
 	}
 
-	return (float)Total;
+	return (geFloat)Total;
 }
 
 #define BOGUS_VERTS		256
@@ -1602,8 +1602,8 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 	{
 		while (1)
 		{
-			float		TexSize, SplitDist;
-			float		Mins16, Maxs16;
+			geFloat		TexSize, SplitDist;
+			geFloat		Mins16, Maxs16;
 
 			Mins = 999999.0f;
 			Maxs = -999999.0f;
@@ -1619,8 +1619,8 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 					Maxs = v;
 			}
 			
-			Mins16 = (float)floor(Mins/16.0f)*16.0f;
-			Maxs16 = (float)ceil(Maxs/16.0f)*16.0f;
+			Mins16 = (geFloat)floor(Mins/16.0f)*16.0f;
+			Maxs16 = (geFloat)ceil(Maxs/16.0f)*16.0f;
 
 			TexSize = Maxs - Mins;
 			//TexSize = Maxs16 - Mins16;
@@ -1632,7 +1632,7 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 			if (TexSize <= SubdivideSize)
 			{
 				int32		Log, LogSize;
-				float		Ratio;
+				geFloat		Ratio;
 
 				LogSize = SnapToPower2((int32)TexSize);
 				Log = GetLog(LogSize);
@@ -1640,7 +1640,7 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 				if (LogSize <= 16)
 					break;						// Don't bother with small lmaps
 
-				Ratio = TexSize / (float)LogSize;	// Get the percentage of the space being taken advantage of if it were to be snapped to power of 2 texture in drivers
+				Ratio = TexSize / (geFloat)LogSize;	// Get the percentage of the space being taken advantage of if it were to be snapped to power of 2 texture in drivers
 
 				if (Ratio >= 0.75f)
 					break;			// No need to split, if going to use at least 50% of the space
@@ -1650,7 +1650,7 @@ void SubdivideFace(GBSP_Node *Node, GBSP_Face *Face)
 				Log--;				// Split along next log down
 
 				// Overide the subdivide size with the next size down
-				SplitDist = (float)(1<<Log);
+				SplitDist = (geFloat)(1<<Log);
 			}
 		#else
 			if (TexSize <= SubdivideSize)

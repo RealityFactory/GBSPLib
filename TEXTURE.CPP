@@ -317,7 +317,10 @@ geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *
 		geBitmap *	LockedImage;
 		void *		Bits;
 
-		if	(geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_8BIT, GE_TRUE, 0xff00ff) == GE_FALSE)
+//Start Dec2001DCS
+      if	(geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_24BIT_RGB, GE_TRUE, 0xff00ff) == GE_FALSE)
+//      if	(geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_8BIT, GE_TRUE, 0xff00ff) == GE_FALSE)
+//End Dec2001DCS
 		{
 			GHook.Error("Could not get mip level %d for texture '%s'.\n", i, Name);
 			return GE_FALSE;
@@ -333,7 +336,9 @@ geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *
 		MipWidth = *Width / (1 << i);
 		MipHeight = *Height / (1 << i);
 
-		if (geVFile_Write(f, Bits, MipWidth * MipHeight) != GE_TRUE)
+//Start Dec2001DCS - Added * 3 since textures are now 24 bit
+		if (geVFile_Write(f, Bits, MipWidth * MipHeight * 3) != GE_TRUE)
+//End Dec2001DCS
 		{
 			GHook.Error("Could not write texture data.\n");
 			return GE_FALSE;
@@ -341,7 +346,9 @@ geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *
 
 		geBitmap_UnLock(LockedImage);
 
-		*Size += MipWidth * MipHeight;
+//Start Dec2001DCS - Added * 3 since textures are now 24 bit
+		*Size += MipWidth * MipHeight * 3;
+//End Dec2001DCS
 	}
 
 	return GE_TRUE;
@@ -379,8 +386,12 @@ geBoolean GetTexturePalette(const char *Name, DRV_Palette Palette)
 	ImagePalette = geBitmap_GetPalette(Image);
 	if	(!ImagePalette)
 	{
-		GHook.Error("Could not find get pallette for texture '%s'.\n", Name);
-		return GE_FALSE;
+//Start Dec2001DCS
+//		GHook.Error("Could not find get pallette for texture '%s'.\n", Name);
+//		return GE_FALSE;
+// No palette found is not an error anymore - 24 bit color bitmaps do not have a palette
+      return GE_TRUE;
+//End Dec2001DCS
 	}
 
 	for	(i = 0; i < 255; i++)

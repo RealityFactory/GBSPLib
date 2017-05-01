@@ -191,7 +191,7 @@ else
 		{
 			geVec3d_Clear(&Plane->Normal);
 			VectorToSUB(Plane->Normal, i) = (geFloat)1;
-			Plane->Dist = PatchSize*(1.0f+(float)floor(Min/PatchSize));
+			Plane->Dist = PatchSize*(1.0f+(geFloat)floor(Min/PatchSize));
 			Plane->Type = PLANE_ANY;
 			return GE_TRUE;		
 		}
@@ -691,7 +691,7 @@ geBoolean CalcReceivers(char *FileName)
 	geRam_Free(RecAmount);
 	RecAmount = NULL;
 
-	Megs = (float)NumReceivers * sizeof(RAD_Receiver) / (1024*1024);
+	Megs = (geFloat)NumReceivers * sizeof(RAD_Receiver) / (1024*1024);
 	GHook.Printf("Num Receivers        : %5i, Megs %2.2f\n", NumReceivers, Megs);
 
 	// Save receiver file for later retreival
@@ -789,7 +789,7 @@ void SendPatch(RAD_Patch *Patch)
 	RAD_Receiver	*Receiver;
 
 	for (k=0; k<3; k++)
-		VectorToSUB(Send, k) = VectorToSUB(Patch->RadSend, k) / (float)0x10000;
+		VectorToSUB(Send, k) = VectorToSUB(Patch->RadSend, k) / (geFloat)0x10000;
 		//VectorToSUB(Send, k) = VectorToSUB(Patch->RadSend, k);
 
 	// Send light out to each pre-computed receiver
@@ -798,7 +798,7 @@ void SendPatch(RAD_Patch *Patch)
 	{
 		RPatch = PatchList[Receiver->Patch];
 
-		geVec3d_AddScaled(&RPatch->RadReceive, &Send, (float)Receiver->Amount, &RPatch->RadReceive);
+		geVec3d_AddScaled(&RPatch->RadReceive, &Send, (geFloat)Receiver->Amount, &RPatch->RadReceive);
 		//geVec3d_AddScaled(&RPatch->RadReceive, &Send, .0005f, &RPatch->RadReceive);
 	}
 }

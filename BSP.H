@@ -29,7 +29,7 @@
 //====================================================================================
 //	Global defines
 //====================================================================================
-#define MAX_BSP_MODELS			2048
+#define MAX_BSP_MODELS			2048*2
 
 #define	PSIDE_FRONT				1
 #define	PSIDE_BACK				2
@@ -38,7 +38,7 @@
 
 #define PLANENUM_LEAF			-1
 
-#define MAX_BSP_PLANES			32000
+#define MAX_BSP_PLANES			32000*2
 
 #define	DIST_EPSILON			(geFloat)0.01
 #define	ANGLE_EPSILON			(geFloat)0.00001
@@ -224,7 +224,7 @@ extern geBoolean	Verbose;
 extern geBoolean	OriginalVerbose;
 extern geBoolean	EntityVerbose;
 
-#define MAX_WELDED_VERTS			64000
+#define MAX_WELDED_VERTS			64000*2
 
 // Defined in TJunct.cpp
 extern int32		NumWeldedVerts;
@@ -262,6 +262,6 @@ void		SnapPlane(geVec3d *Normal, geFloat *Dist);
 void		PlaneInverse(GBSP_Plane *Plane);
 int32		FindPlane(GBSP_Plane *Plane, int32 *Side);
 void		PlaneInverse(GBSP_Plane *Plane);
-float		_fastcall Plane_PointDistanceFast(GBSP_Plane *Plane, geVec3d *Point);
+geFloat		_fastcall Plane_PointDistanceFast(GBSP_Plane *Plane, geVec3d *Point);
 
 #endif

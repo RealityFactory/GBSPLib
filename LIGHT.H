@@ -29,7 +29,7 @@
 #include "GBSPLib.h"				// Lightparms
 #include "BSP.h"
 
-#define MAX_PATCHES		65000		// Any higher and 16 bit overflow will result
+#define MAX_PATCHES		65000*2		// eaa3 using int32 for lights, so pushed the size up
 
 #define MAX_LTYPES		4
 #define MAX_LTYPE_INDEX	12
@@ -39,30 +39,31 @@
 //#define	MAX_LMAP_SIZE	64			// In lightmap pexels (This will allow the face to be 64*16 in floating units at lmap scale of 1.0f)
 #define	MAX_LMAP_SIZE	18			// In lightmap pexels
 
-extern float		LightScale;
-extern float		EntityScale;
-extern float		MaxLight;
+extern geFloat		LightScale;
+extern geFloat		EntityScale;
+extern geFloat		MaxLight;
 extern int32		NumSamples;
 
 extern geBoolean	LVerbose;
 extern geBoolean	DoRadiosity;
-extern float		PatchSize;
+extern geFloat		PatchSize;
 extern int32		NumBounce;
 extern geBoolean	FastPatch;
-extern float		ReflectiveScale;
+extern geFloat		ReflectiveScale;
 
 extern geVec3d		MinLight;
 
 int32 FindGFXLeaf(int32 Node, geVec3d *Vert);
 geBoolean RayCollision(geVec3d *Front, geVec3d *Back, geVec3d *I);
+geBoolean RayCollisionButSky(geVec3d *Front, geVec3d *Back, geVec3d *I);
 
 typedef struct
 {
 	geVec3d		*RGBLData[MAX_LTYPE_INDEX];
 	int32		NumLTypes;
 	geBoolean	RGB;
-	float		Mins[2];
-	float		Maxs[2];
+	geFloat		Mins[2];
+	geFloat		Maxs[2];
 	int32		LMaxs[2];
 	int32		LMins[2];
 	int32		LSize[2];
@@ -100,9 +101,9 @@ typedef struct _RAD_Patch
 	GBSP_Poly		*Poly;				// Poly for patch	(Not used thoughout entire life)
 	geVec3d			Origin;				// Origin
 	int32			Leaf;				// Leaf patch is looking into
-	float			Area;				// Area of patch
+	geFloat			Area;				// Area of patch
 	GBSP_Plane		Plane;				// Plane
-	uint16			NumReceivers;
+	uint32			NumReceivers;
 	_RAD_Receiver	*Receivers;			// What patches this patch emits to
 	int32			NumSamples;			// Number of samples lightmaps has contributed
 
@@ -121,14 +122,14 @@ typedef struct _RAD_Receiver
 {
 	//_RAD_Receiver	*Next;				// Next Receiver for patch
 	//RAD_Patch		*Patch;				// Patch this Receiver emits ti
-	//float			Amount;				// How much to the receiving patch gets
-	uint16			Patch;
-	uint16			Amount;
+	//geFloat			Amount;				// How much to the receiving patch gets
+	uint32			Patch;
+	uint32			Amount;
 } RAD_Receiver;
 
 extern pRAD_Patch	*FacePatches;
 extern pRAD_Patch	*PatchList;
-extern float		*RecAmount;
+extern geFloat		*RecAmount;
 
 extern int32		NumPatches;
 extern int32		NumReceivers;
@@ -144,7 +145,7 @@ typedef struct Tri_Edge
 {
 	int32				p0, p1;
 	geVec3d				normal;
-	float				dist;
+	geFloat				dist;
 	struct Tri			*tri;
 } Tri_Edge;
 
@@ -153,15 +154,15 @@ typedef struct Tri
 	Tri_Edge			*Edges[3];
 } Tri;
 
-#define	MAX_TRI_POINTS		1024
+#define	MAX_TRI_POINTS		1024*4
 #define	MAX_TRI_EDGES		(MAX_TRI_POINTS*6)
 #define	MAX_TRI_TRIS		(MAX_TRI_POINTS*2)
 
 typedef struct
 {
-	int			NumPoints;
-	int			NumEdges;
-	int			NumTris;
+	int32			NumPoints;
+	int32			NumEdges;
+	int32			NumTris;
 	GBSP_Plane	*Plane;
 	Tri_Edge	*EdgeMatrix[MAX_TRI_POINTS][MAX_TRI_POINTS];
 	RAD_Patch	*Points[MAX_TRI_POINTS];

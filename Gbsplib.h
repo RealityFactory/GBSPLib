@@ -53,12 +53,12 @@ typedef struct
 {
 	geBoolean	Verbose;
 	geBoolean	ExtraSamples;
-	float		LightScale;
+	geFloat		LightScale;
 	geBoolean	Radiosity;
 	int32		NumBounce;
-	float		PatchSize;
+	geFloat		PatchSize;
 	geBoolean	FastPatch;
-	float		ReflectiveScale;
+	geFloat		ReflectiveScale;
 
 	geVec3d	MinLight;			// R,G,B (XYZ) min color for each faces lightmap
 
