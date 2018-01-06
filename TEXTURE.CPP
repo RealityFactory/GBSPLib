@@ -4,6 +4,12 @@
 /*  Author: John Pollard                                                                */
 /*  Description: This code keeps a list of shared textures.                             */
 /*                                                                                      */
+/*  Edit History:                                                                       */
+/*   11/11/2003 Wendell Buckner                                                         */
+/*    Bumpmapping for the World                                                         */
+/*   10/15/2003 Wendell Buckner                                                         */
+/*    Bumpmapping for the World                                                         */
+/*                                                                                      */
 /*  The contents of this file are subject to the Genesis3D Public License               */
 /*  Version 1.01 (the "License"); you may not use this file except in                   */
 /*  compliance with the License. You may obtain a copy of the License at                */
@@ -15,8 +21,8 @@
 /*  under the License.                                                                  */
 /*                                                                                      */
 /*  The Original Code is Genesis3D, released March 25, 1999.                            */
-/*Genesis3D Version 1.1 released November 15, 1999                            */
-/*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved           */
+/*  Genesis3D Version 1.1 released November 15, 1999                                    */
+/*  Copyright (C) 1999 WildTangent, Inc. All Rights Reserved                            */
 /*                                                                                      */
 /****************************************************************************************/
 #include <Windows.h>
@@ -67,6 +73,44 @@ int32 FindTextureIndex(char *Name, uint32 Flags)
 		GHook.Error("FindTextureIndex:  Too many Textures in map.");
 		return -1;
 	}
+
+/* 10/15/2003 Wendell Buckner
+    Bumpmapping for the World */
+	do
+	{
+	 char *GreyBumpmapName = NULL;
+
+/* 11/11/2003 Wendell Buckner
+    Bumpmapping for the World */
+		char *SpecularBumpmapName = NULL;
+
+		NamedBitmap *	Bitmap = NULL;
+
+//Check for base bumpmap name
+		if (!geBitmap_IsBumpmapName(Name)) break;
+
+//Add grey bumpmap name
+		GreyBumpmapName = geBitmap_GetGreyBumpmapName(Name);
+		if(!GreyBumpmapName )break;
+
+		strcpy(Textures[NumTextures].Name, GreyBumpmapName);
+		Textures[NumTextures].Flags = Flags;
+
+		NumTextures++;
+
+/* 11/11/2003 Wendell Buckner
+    Bumpmapping for the World */
+
+//Add specular bumpmap name
+		SpecularBumpmapName = geBitmap_GetSpecularBumpmapName(Name);
+		if(!SpecularBumpmapName )break;
+
+		strcpy(Textures[NumTextures].Name, SpecularBumpmapName);
+		Textures[NumTextures].Flags = Flags;
+
+		NumTextures++;
+	}
+	while(GE_FALSE);
 
 	strcpy(Textures[NumTextures].Name, Name);
 	Textures[NumTextures].Flags = Flags;
@@ -319,6 +363,10 @@ geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *
 		}
 
 		assert(NumBitmaps > 0);
+
+/* 10/15/2003 Wendell Buckner
+    Bumpmapping for the World */
+		if( geBitmap_IsGreyBumpmapName(Name) || geBitmap_IsSpecularBumpmapName(Name) ) strcpy(Name,Bitmaps[0].Name);
 
 		Name  = Bitmaps[0].Name;
 		Image = Bitmaps[0].Bitmap;
