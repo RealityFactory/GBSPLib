@@ -33,6 +33,8 @@
 #include	"bitmap.h"
 #include	"ram.h"
 
+//#define USEPERPIXEL
+
 int32		NumTextures;
 GFX_Texture	Textures[MAX_MAP_TEXTURES];
 int32		NumTexInfo;
@@ -266,6 +268,37 @@ static	NamedBitmap *	FindBitmapByName(const char *Name)
 	return NULL;
 }
 
+// added transparent textures
+geBoolean HasTextureAlpha(char *Name)
+{
+	geBitmap *		Image;
+	NamedBitmap *	Bitmap;
+
+	Bitmap = FindBitmapByName(Name);
+
+	if	(Bitmap == NULL)
+	{
+		GHook.Printf("Could not find texture alpha'%s' in texture library.\n", Name);
+		if	(!Bitmaps)
+		{
+			GHook.Error("Could not find any textures in texture library.\n");
+			return GE_FALSE;
+		}
+
+		assert(NumBitmaps > 0);
+
+		Name  = Bitmaps[0].Name;
+		Image = Bitmaps[0].Bitmap;
+	}
+	else
+	{
+		Image = Bitmap->Bitmap;
+	}
+
+	return geBitmap_HasAlpha(Image);
+}
+// end transparent textures
+
 //========================================================================================
 //========================================================================================
 geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *Height, geVFile *f)
@@ -300,9 +333,16 @@ geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *
 	*Width = geBitmap_Width(Image);
 	*Height = geBitmap_Height(Image);
 
+/* 11/24/2002 Wendell Buckner
+    Allow much higher dimensions than 256 x 256
 	if	(*Width > 256 || *Height > 256)
 	{
 		GHook.Error("Texture '%s' has a dimension bigger than 256.\n", Name);
+		return GE_FALSE;
+	}	*/
+	if	( *Width > 16384 || *Height > 16384 )
+	{
+		GHook.Error("Texture '%s' has a dimension bigger than 16384.\n", Name);
 		return GE_FALSE;
 	}
 
@@ -310,17 +350,36 @@ geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *
 	geBitmap_UpdateMips(Image, 0, 1);
 	geBitmap_UpdateMips(Image, 1, 2);
 	geBitmap_UpdateMips(Image, 2, 3);
-	for	(i = 0; i < 4; i++)
+// added transparent textures - only 1 mip sent
+	for	(i = 0; i < 1; i++)
 	{
 		int			MipWidth;
 		int			MipHeight;
 		geBitmap *	LockedImage;
 		void *		Bits;
+		uint8		depth;
+		geBoolean	lock;
+
+		depth = GE_PIXELFORMAT_24BIT_RGB;
+		if(geBitmap_HasAlpha(Image))
+			depth = GE_PIXELFORMAT_32BIT_ARGB;
+		geVFile_Write(f, &depth, 1);
+		*Size += 1;
+
+		if(depth == GE_PIXELFORMAT_24BIT_RGB)
+			lock = geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_24BIT_RGB, GE_TRUE, 0xffff00ff);
+		else
+			lock = geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_32BIT_ARGB, GE_TRUE, 0xffff00ff);
 
 //Start Dec2001DCS
-      if	(geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_24BIT_RGB, GE_TRUE, 0xff00ff) == GE_FALSE)
-//      if	(geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_8BIT, GE_TRUE, 0xff00ff) == GE_FALSE)
+// added transparent textures
+//#ifdef USEPERPIXEL
+//	  if(geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_32BIT_ARGB, GE_TRUE, 0xffff00ff) == GE_FALSE)
+//#else
+//	  if(geBitmap_LockForRead(Image, &LockedImage, i, i, GE_PIXELFORMAT_24BIT_RGB, GE_TRUE, 0xffff00ff) == GE_FALSE)
+//#endif
 //End Dec2001DCS
+		if(lock == GE_FALSE)
 		{
 			GHook.Error("Could not get mip level %d for texture '%s'.\n", i, Name);
 			return GE_FALSE;
@@ -329,16 +388,27 @@ geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *
 		Bits = geBitmap_GetBits(LockedImage);
 		if	(!Bits)
 		{
-			GHook.Error("Could not get mip bits for texture '%s'.\n", i, Name);
+			GHook.Error("Could not get mip bits for texture '%s'.\n", Name);
 			return GE_FALSE;
 		}
 
 		MipWidth = *Width / (1 << i);
 		MipHeight = *Height / (1 << i);
 
-//Start Dec2001DCS - Added * 3 since textures are now 24 bit
-		if (geVFile_Write(f, Bits, MipWidth * MipHeight * 3) != GE_TRUE)
+		if(depth == GE_PIXELFORMAT_24BIT_RGB)
+			lock = geVFile_Write(f, Bits, MipWidth * MipHeight * 3);
+		else
+			lock = geVFile_Write(f, Bits, MipWidth * MipHeight * 4);
+
+//Start Dec2001DCS - Added * 4 since textures are now 32 bit
+// added transparent textures
+//#ifdef USEPERPIXEL
+//		if (geVFile_Write(f, Bits, MipWidth * MipHeight * 4) != GE_TRUE)
+//#else
+//		if (geVFile_Write(f, Bits, MipWidth * MipHeight * 3) != GE_TRUE)
+//#endif
 //End Dec2001DCS
+		if (lock != GE_TRUE)
 		{
 			GHook.Error("Could not write texture data.\n");
 			return GE_FALSE;
@@ -346,8 +416,13 @@ geBoolean GetTexture(char *Name, uint8 *Data, int32 *Size, int32 *Width, int32 *
 
 		geBitmap_UnLock(LockedImage);
 
-//Start Dec2001DCS - Added * 3 since textures are now 24 bit
+//Start Dec2001DCS - Added * 4 since textures are now 32 bit
+// added transparent textures
+	if(depth == GE_PIXELFORMAT_24BIT_RGB)
 		*Size += MipWidth * MipHeight * 3;
+	else
+		*Size += MipWidth * MipHeight * 4;
+
 //End Dec2001DCS
 	}
 

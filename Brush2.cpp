@@ -190,7 +190,9 @@ MAP_Brush *LoadMapBrush(geVFile *VFile)
 
 		// Don't allow alpha values on faces that don't have the TRANS flag set...
 		if (!(Tx.Flags & TEXINFO_TRANS))
+		{
 			FaceHeader.Alpha = 255.0f;
+		}
 
 		// Copy the brush's alpha directly over to the faces texinfo
 		Tx.Alpha = (geFloat)FaceHeader.Alpha;

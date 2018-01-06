@@ -840,6 +840,7 @@ geBoolean SaveGFXTextures(geVFile *f)
 	int32		Size, Width, Height, Offset, i;
 	char		*File;
 	DRV_Palette	Palette;
+	int TexNum;
 
 	File = ValueForKey(&Entities[0], "TextureLib");
 	if (!File || !File[0])
@@ -903,6 +904,17 @@ geBoolean SaveGFXTextures(geVFile *f)
 		GHook.Error("SaveGFXTexture:  There was an error saving the texture.\n");
 		return GE_FALSE;
 	}
+// added transparent textures
+	for(i=0;i<NumTexInfo;i++)
+	{
+		TexNum = TexInfo[i].Texture;
+		if(HasTextureAlpha(Textures[TexNum].Name)==GE_TRUE)
+		{
+			TexInfo[i].Flags |= TEXINFO_TRANS;
+			TexInfo[i].Alpha = 255.0f;
+		}
+	}
+// end transparent textures
 
 	// Now save tex info
 	NumGFXTexInfo = NumTexInfo;

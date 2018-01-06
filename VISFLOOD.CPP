@@ -363,6 +363,7 @@ geBoolean FloodPortalsSlow_r(VIS_Portal *SrcPortal, VIS_Portal *DestPortal, VIS_
 	for (Portal = Leaf->Portals; Portal; Portal = Portal->Next)
 	{
 		PNum = (int32)(Portal - VisPortals);
+
 		Bit = 1<<(PNum&7);
 
 		//GHook.Printf("PrevStack VisBits:  %i\n", PrevStack->VisBits[PNum>>3]);
@@ -508,6 +509,8 @@ geBoolean FloodLeafPortalsSlow(int32 LeafNum)
 	VIS_PStack	PStack;
 	int32		i;
 
+	GHook.Printf("Flood Leaf Portal for leaf %d\n", LeafNum);
+
 	Leaf = &VisLeafs[LeafNum];
 
 	if (!Leaf->Portals)
@@ -557,11 +560,15 @@ geBoolean FloodPortalsSlow(void)
 	VIS_PStack	PStack;
 	int32		i, k;
 
+	GHook.Printf("FloodFill all Portals for Full Vis\n");
+
 	for (k=0; k< NumVisPortals; k++)
 		VisPortals[k].Done = GE_FALSE;
 
 	for (k=0; k< NumVisPortals; k++)
 	{
+		GHook.Printf("Flood Portals Slow for %d of %d\n", k, NumVisPortals);
+
 		Portal = VisSortedPortals[k];
 		
 		Portal->FinalVisBits = GE_RAM_ALLOCATE_ARRAY(uint8,NumVisPortalBytes);

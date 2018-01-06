@@ -55,5 +55,8 @@ extern GFX_TexInfo	TexInfo[MAX_MAP_TEXINFO];
 
 int32 FindTextureIndex(char *Name, uint32 Flags);
 int32 FindTexInfo(GFX_TexInfo *Tex2);
+// added transparent textures
+geBoolean HasTextureAlpha(char *Name);
+// end transparent textures
 
 #endif

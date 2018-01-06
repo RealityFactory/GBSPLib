@@ -163,6 +163,8 @@ geBoolean VisAllLeafs(void)
 {
 	int32	i;
 
+	GHook.Printf("Starting to Vis all Leafs\n");
+
 	// Create PortalSeen array.  This is used by Vis flooding routines
 	// This is deleted below...
 	PortalSeen = GE_RAM_ALLOCATE_ARRAY(uint8,NumVisPortals);
@@ -244,6 +246,8 @@ geBoolean CollectLeafVisBits(int32 LeafNum)
 	uint8		*LeafBits, *VisBits;
 	int32		k, Bit, SLeaf;
 	
+	GHook.Printf("Collect Leaf Vis Bits for leaf %d\n", LeafNum);
+
 	Leaf = &VisLeafs[LeafNum];
 
 	LeafBits = &LeafVisBits[LeafNum * NumVisLeafBytes];
@@ -326,6 +330,8 @@ geBoolean LoadPortalFile(char *FileName)
 	geVFile		*f;
 
 	pPoly = NULL;
+
+	GHook.Printf("Loading Portal File : %s\n", FileName);
 
 	// open the file
 	f = geVFile_OpenNewSystem(NULL, GE_VFILE_TYPE_DOS, FileName, NULL, GE_VFILE_OPEN_READONLY);
